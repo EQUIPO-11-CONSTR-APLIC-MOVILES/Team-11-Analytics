@@ -9,7 +9,7 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 import pandas as pd
 
-cred = credentials.Certificate('insert certificate location')
+cred = credentials.Certificate('restau-5dba7-firebase-adminsdk-jpame-be78ad3e26.json')
 app = firebase_admin.initialize_app(cred)
 firestoreDB = firestore.client()
 
@@ -61,3 +61,74 @@ async def create_questions(question: QuestionBase, db: db_dependency):
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+@app.get("/screentimes/clean")
+async def root(db: db_dependency):
+    db.query(models.LastVisit).delete()
+    db.query(models.WeekScreenTime).delete()
+    db_visit = models.LastVisit(id = 1, year = 0, week = 0)
+    db.merge(db_visit)
+    db.commit()
+    return {
+        "response": "Database Successfully cleaned"
+    }
+
+@app.get("/screentimes")
+async def setup(db: db_dependency):
+
+    #Retriving cached moment of visit
+    visitRetrieved = db.query(models.LastVisit).filter(models.LastVisit.id == 1).first()
+
+    latestWeek = visitRetrieved.week
+    latestYear = visitRetrieved.year
+
+    #Getting current moment
+    currentWeek = pd.Timestamp.now().week
+    currentYear = pd.Timestamp.now().year
+
+    #Checking if the cached answer is to be used
+    if (latestYear != currentYear or latestWeek != currentWeek):
+
+        print("Retrieving answer...")
+
+        #Firebase events retrieval
+        docs = firestoreDB.collection("screen_time_events").get()
+
+        #Turning documents into a pandas dataframe
+        dictArray = []
+        for doc in docs:
+            dictArray.append(doc.to_dict())
+        df = pd.DataFrame(dictArray)
+
+        #Ordering and getting the necessary data
+        df["week"] = df["date"].transform(lambda date: date.week)
+        df["year"] = df["date"].transform(lambda date: date.year)
+        df["week"] = df["year"].astype(str) + "-" + df["week"].astype(str)
+        cols = ["screen", "user_id", "week", "time_seconds"]
+        df = df[cols]
+
+        #Performing the analysis process
+        grouped = df.groupby(["screen", "user_id", "week"])
+        firstgrouped = grouped.sum()
+        grouped = firstgrouped.groupby(["screen", "user_id"])
+        secondgrouped = grouped.mean()
+        grouped = secondgrouped.groupby("screen")
+        answer = grouped.mean()
+        #Saving the answer in local storage
+        for index, row in answer.iterrows():
+            db_screen = models.WeekScreenTime(screen = index, time = float(row["time_seconds"]))
+            db.merge(db_screen)
+            db.commit()
+    
+    #Lastest visit update
+    db_visit = models.LastVisit(id = 1, year = currentYear, week = currentWeek)
+    db.merge(db_visit)
+    db.commit()
+
+    #Answer building
+    answer = {}
+    dataRetrieval = db.query(models.WeekScreenTime).all()
+    for entry in dataRetrieval:
+        answer[entry.screen] = entry.time
+    return answer
+    
