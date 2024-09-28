@@ -127,7 +127,7 @@ async def setup(db: db_dependency):
 
     #Answer building
     answer = {}
-    dataRetrieval = db.query(models.WeekScreenTime).all()
+    dataRetrieval = db.query(models.WeekScreenTime).order_by(models.WeekScreenTime.time).all()
     for entry in dataRetrieval:
         answer[entry.screen] = entry.time
     return answer
