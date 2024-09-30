@@ -1,6 +1,20 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float
 from database import Base
 
+
+class WeekScreenTime(Base):
+    __tablename__ = 'weekscreentime'
+    screen = Column(String, primary_key=True, index = True)
+    time = Column(Float, index = True)
+
+class LastVisit(Base):
+    __tablename__ = 'lastvisit'
+    id = Column(Integer, primary_key=True, index = True)
+    year = Column(Integer, index = True)
+    week = Column(Integer, index = True)
+
+
+
 """
 class Questions(Base):
     __tablename__ = 'questions'
