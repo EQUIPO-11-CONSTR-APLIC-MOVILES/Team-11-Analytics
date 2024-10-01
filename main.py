@@ -131,4 +131,73 @@ async def setup(db: db_dependency):
     for entry in dataRetrieval:
         answer[entry.screen] = entry.time
     return answer
-    
+
+
+@app.get("/navigation-paths")
+async def setup():
+
+    # Add a path to the tree
+    def add_path(tree, path):
+        current_node = tree
+        for i in range(len(path)):
+            screen = path[i]
+           
+            if screen not in current_node:
+                current_node[screen] = {"count": 0, "next": {}, "end_count": 0}
+
+            current_node[screen]["count"] += 1
+
+            if i == len(path) - 1:
+                current_node[screen]["end_count"] += 1
+            else:
+                current_node = current_node[screen]["next"]
+
+    # Collect traversed paths with at least 3 screens
+    def collect_paths(tree, current_path, min_length=3):
+        paths_with_counts = []
+        
+        # Internal function to traverse the tree and collect paths
+        def traverse(current_node, current_path):
+            for screen, data in current_node.items():
+                new_path = current_path + [screen]
+                if len(new_path) >= min_length:
+                    paths_with_counts.append((new_path, data["count"]))
+                traverse(data["next"], new_path)
+        
+        traverse(tree, current_path)
+        return paths_with_counts
+
+    # Get the top N most common paths
+    def get_top_paths(tree, top_n=5, min_length=3):
+        paths = collect_paths(tree, [], min_length=min_length)
+        sorted_paths = sorted(paths, key=lambda x: x[1], reverse=True)
+        return sorted_paths[:top_n]
+
+    # Create the tree
+    tree = {}
+
+    # Fetch the navigation paths from the database
+    data = firestoreDB.collection("navigation_paths").get()
+
+    # Parse and add each path to the tree
+    for d in data:
+        d = d.to_dict()["path"].split(" > ")  # Example: "Home > Liked > Search"
+        add_path(tree, d)
+
+    # Get the top N paths and preserve order
+    top_paths = get_top_paths(tree)
+
+    # Convert paths to source-target transitions while preserving sequence
+    transitions = []
+    for path, count in top_paths:
+        # Build source-target pairs with positional labels
+        for i in range(len(path) - 1):
+            source = f"{i+1}: {path[i]}"     # Add position to the source
+            target = f"{i+2}: {path[i+1]}"   # Add position to the target
+            transitions.append({
+                "source": source,
+                "target": target,
+                "users": count
+            })
+
+    return transitions
