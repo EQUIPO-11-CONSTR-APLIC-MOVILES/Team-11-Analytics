@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Annotated
@@ -230,5 +231,73 @@ async def setup(userID, lat, lon):
     except:
         return None
     
+
+@app.get("/restaurant_search_types")
+async def get_restaurant_search_types(db: db_dependency):
+    try:
+        docs = firestoreDB.collection("restaurant_search_types").get()
+
+        type_count = {}
+
+        for doc in docs:
+            doc_data = doc.to_dict() 
+            for type_key in doc_data.keys():
+                if type_key in type_count:
+                    type_count[type_key] += 1
+                else:
+                    type_count[type_key] = 1
+
+        if not type_count:
+            return {"message": "No types found"}
         
+        for key, value in type_count.items():
+            db_screen = models.RestaurantTypes(resType=key, count=value)
+            db.add(db_screen)
+            db.commit()
+
+        return type_count
+
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/FeaturesInteractions")
+async def setup(db: db_dependency):
+
+    docs = firestoreDB.collection("features_interactions").get()
+
+    dictArray = []
+    for doc in docs:
+        dictArray.append(doc.to_dict())
+    df = pd.DataFrame(dictArray)
+
+    # Agrupar por 'nameFeatureInteraction' y contar el número de ocurrencias
+    result = df.groupby('nameFeatureInteraction').size().reset_index(name='count')
+
+    total_interactions = result['count'].sum()
+
+    print(result)
+
+    for index, row in result.iterrows():
+        db_featureinteraction = models.FeatureInteraction(
+            featureName=row["nameFeatureInteraction"], 
+            count=int(row["count"]), 
+            datatime_data=datetime.utcnow(),
+            percentage_uses = round((int(row["count"]) / total_interactions) * 100,2)
+        )
+        print(datetime.utcnow())
+        db.merge(db_featureinteraction)
+    db.commit()
+
+    answer = {}
     
+    for index, row in result.iterrows():
+        answer[row["nameFeatureInteraction"]] = int(row["count"])
+        answer[row["nameFeatureInteraction"] + "Percentage"] = round((int(row["count"]) / total_interactions) * 100,2)
+
+    most_used_feature = result.loc[result['count'].idxmax()]
+    less_used_feature = result.loc[result['count'].idxmin()]
+
+    answer["MostUsedFeature"] = most_used_feature["nameFeatureInteraction"]
+    answer["LessUsedFeature"] = less_used_feature["nameFeatureInteraction"]
+
+    return answer
