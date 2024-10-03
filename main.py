@@ -8,6 +8,7 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 import pandas as pd
+from haversine import haversine
 
 cred = credentials.Certificate('restau-5dba7-firebase-adminsdk-jpame-be78ad3e26.json')
 app = firebase_admin.initialize_app(cred)
@@ -201,3 +202,33 @@ async def setup():
             })
 
     return transitions
+
+@app.get("/nearbyxcuisine")
+async def setup(userID, lat, lon):
+    try:
+        cuisines = set(firestoreDB.collection("Preference Tags").document("tags").get().to_dict()["Cuisine"]["list"])
+        preferences = set(firestoreDB.collection("users").document(userID).get().to_dict()["preferences"])
+
+        prefCuisine = cuisines.intersection(preferences)
+        
+        userLoc = (float(lat), float(lon))
+        
+        for restaurant in firestoreDB.collection("restaurants").get():
+            restaurant = restaurant.to_dict()
+            
+            restCat = set(restaurant["categories"])     
+            
+            intersec = prefCuisine.intersection(restCat)
+            
+            if len(intersec)>0:
+                restLoc = (float(restaurant['latitude']), float(restaurant['longitude']))
+                distance = haversine(userLoc, restLoc)
+                
+                if distance < 1:
+                    return list(intersec)[0]
+    
+    except:
+        return None
+    
+        
+    
