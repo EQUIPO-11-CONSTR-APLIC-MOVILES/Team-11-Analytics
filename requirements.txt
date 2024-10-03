@@ -4,3 +4,4 @@ psycopg2-binary
 uvicorn
 firebase_admin
 pandas
+haversine
