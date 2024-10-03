@@ -1,7 +1,6 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Float
 from database import Base
 
-
 class WeekScreenTime(Base):
     __tablename__ = 'weekscreentime'
     screen = Column(String, primary_key=True, index = True)
@@ -20,6 +19,10 @@ class FeatureInteraction(Base):
     percentage_uses = Column(Float, index= True)
     datatime_data = Column(DateTime, index=True)
 
+class RestaurantTypes(Base):
+    __tablename__ = 'searchedRestaurantTypes'
+    resType = Column(String, primary_key=True, index = True)
+    count = Column(Integer, index = True)
 
 
 

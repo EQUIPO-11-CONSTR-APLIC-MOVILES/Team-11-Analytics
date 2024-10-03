@@ -203,6 +203,34 @@ async def setup():
 
     return transitions
 
+@app.get("/restaurant_search_types")
+async def get_restaurant_search_types(db: db_dependency):
+    try:
+        docs = firestoreDB.collection("restaurant_search_types").get()
+
+        type_count = {}
+
+        for doc in docs:
+            doc_data = doc.to_dict() 
+            for type_key in doc_data.keys():
+                if type_key in type_count:
+                    type_count[type_key] += 1
+                else:
+                    type_count[type_key] = 1
+
+        if not type_count:
+            return {"message": "No types found"}
+        
+        for key, value in type_count.items():
+            db_screen = models.RestaurantTypes(resType=key, count=value)
+            db.add(db_screen)
+            db.commit()
+
+        return type_count
+
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/FeaturesInteractions")
 async def setup(db: db_dependency):
 
