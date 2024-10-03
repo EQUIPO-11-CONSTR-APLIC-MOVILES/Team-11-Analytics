@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Float
 from database import Base
 
 
@@ -12,6 +12,14 @@ class LastVisit(Base):
     id = Column(Integer, primary_key=True, index = True)
     year = Column(Integer, index = True)
     week = Column(Integer, index = True)
+
+class FeatureInteraction(Base):
+    __tablename__ = 'FeaturesInteractions'
+    featureName = Column(String, primary_key=True, index = True)
+    count = Column(Integer, index = True)
+    percentage_uses = Column(Float, index= True)
+    datatime_data = Column(DateTime, index=True)
+
 
 
 
