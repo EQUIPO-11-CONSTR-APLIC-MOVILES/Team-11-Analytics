@@ -231,6 +231,13 @@ async def setup(userID, lat, lon):
     except:
         return None
     
+@app.get("/restaurant_search_types/clean")
+async def root(db: db_dependency):
+    db.query(models.RestaurantTypes).delete()
+    db.commit()
+    return {
+        "response": "Database Successfully cleaned"
+    }
 
 @app.get("/restaurant_search_types")
 async def get_restaurant_search_types(db: db_dependency):
@@ -239,8 +246,9 @@ async def get_restaurant_search_types(db: db_dependency):
 
         type_count = {}
 
+        # Count the occurrences of each restaurant type
         for doc in docs:
-            doc_data = doc.to_dict() 
+            doc_data = doc.to_dict()
             for type_key in doc_data.keys():
                 if type_key in type_count:
                     type_count[type_key] += 1
@@ -251,13 +259,16 @@ async def get_restaurant_search_types(db: db_dependency):
             return {"message": "No types found"}
         
         for key, value in type_count.items():
+            # Prepare the data to be merged (insert if new, update if existing)
             db_screen = models.RestaurantTypes(resType=key, count=value)
-            db.add(db_screen)
-            db.commit()
+            db.merge(db_screen)  # Use merge to update or insert
+            
+        db.commit()  # Commit all changes after the loop
 
         return type_count
 
     except Exception as e:
+        db.rollback()  # Rollback in case of error
         return {"error": str(e)}
 
 @app.get("/FeaturesInteractions")
