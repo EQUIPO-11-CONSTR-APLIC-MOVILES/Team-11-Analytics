@@ -10,6 +10,7 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 import pandas as pd
 from haversine import haversine
+from haversine import haversine
 
 cred = credentials.Certificate('restau-5dba7-firebase-adminsdk-jpame-be78ad3e26.json')
 app = firebase_admin.initialize_app(cred)
@@ -231,13 +232,6 @@ async def setup(userID, lat, lon):
     except:
         return None
     
-@app.get("/restaurant_search_types/clean")
-async def root(db: db_dependency):
-    db.query(models.RestaurantTypes).delete()
-    db.commit()
-    return {
-        "response": "Database Successfully cleaned"
-    }
 
 @app.get("/restaurant_search_types")
 async def get_restaurant_search_types(db: db_dependency):
