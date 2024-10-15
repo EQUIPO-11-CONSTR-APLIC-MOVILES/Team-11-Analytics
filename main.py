@@ -261,9 +261,11 @@ async def get_restaurant_search_types(db: db_dependency):
             return {"message": "No types found"}
         
         for key, value in type_count.items():
+            # Prepare the data to be merged (insert if new, update if existing)
             db_screen = models.RestaurantTypes(resType=key, count=value)
-            db.merge(db_screen) 
-        db.commit()  
+            db.merge(db_screen)  # Use merge to update or insert
+            
+        db.commit()  # Commit all changes after the loop
 
         return type_count
 
