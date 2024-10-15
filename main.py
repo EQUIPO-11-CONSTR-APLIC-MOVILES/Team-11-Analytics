@@ -280,18 +280,16 @@ async def setup(db: db_dependency):
 
     total_interactions = result['count'].sum()
 
-    print(result)
-
-    for index, row in result.iterrows():
-        db_featureinteraction = models.FeatureInteraction(
-            featureName=row["nameFeatureInteraction"], 
-            count=int(row["count"]), 
-            datatime_data=datetime.utcnow(),
-            percentage_uses = round((int(row["count"]) / total_interactions) * 100,2)
-        )
-        print(datetime.utcnow())
-        db.merge(db_featureinteraction)
-    db.commit()
+    # for index, row in result.iterrows():
+    #     db_featureinteraction = models.FeatureInteraction(
+    #         featureName=row["nameFeatureInteraction"], 
+    #         count=int(row["count"]), 
+    #         datatime_data=datetime.utcnow(),
+    #         percentage_uses = round((int(row["count"]) / total_interactions) * 100,2)
+    #     )
+    #     print(datetime.utcnow())
+    #     db.merge(db_featureinteraction)
+    # db.commit()
 
     answer = {}
     
