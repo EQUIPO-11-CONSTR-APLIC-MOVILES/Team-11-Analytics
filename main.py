@@ -244,7 +244,7 @@ async def root(db: db_dependency):
 async def get_restaurant_search_types(db: db_dependency):
     try:
         # Fetch documents from Firestore
-        docs = await firestoreDB.collection("restaurant_search_types").get()
+        docs = firestoreDB.collection("restaurant_search_types").get()
 
         type_count = {}
 
