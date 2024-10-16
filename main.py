@@ -265,8 +265,7 @@ async def get_restaurant_search_types(db: Session = Depends(db_dependency)):
 
         if not type_count:
             return {"message": "No types found"}
-
-        # Upsert logic: update or insert each restaurant type
+        
         for key, value in type_count.items():
             # Check if the resType already exists in the database
             existing_type = db.query(models.RestaurantTypes).filter_by(resType=key).first()
@@ -278,7 +277,7 @@ async def get_restaurant_search_types(db: Session = Depends(db_dependency)):
                 # If it doesn't exist, insert a new record
                 new_type = models.RestaurantTypes(resType=key, count=value)
                 db.add(new_type)
-
+        
         db.commit()  # Commit all changes after the loop
 
         return {"updated_types": type_count}
