@@ -232,6 +232,14 @@ async def setup(userID, lat, lon):
     except:
         return None
     
+@app.get("/restaurant_search_types/clean")
+async def root(db: db_dependency):
+    db.query(models.RestaurantTypes).delete()
+    db.merge()
+    db.commit()
+    return {
+        "response": "Database Successfully cleaned"
+    }
 
 @app.get("/restaurant_search_types")
 async def get_restaurant_search_types(db: db_dependency):
@@ -280,18 +288,16 @@ async def setup(db: db_dependency):
 
     total_interactions = result['count'].sum()
 
-    print(result)
-
-    for index, row in result.iterrows():
-        db_featureinteraction = models.FeatureInteraction(
-            featureName=row["nameFeatureInteraction"], 
-            count=int(row["count"]), 
-            datatime_data=datetime.utcnow(),
-            percentage_uses = round((int(row["count"]) / total_interactions) * 100,2)
-        )
-        print(datetime.utcnow())
-        db.merge(db_featureinteraction)
-    db.commit()
+    # for index, row in result.iterrows():
+    #     db_featureinteraction = models.FeatureInteraction(
+    #         featureName=row["nameFeatureInteraction"], 
+    #         count=int(row["count"]), 
+    #         datatime_data=datetime.utcnow(),
+    #         percentage_uses = round((int(row["count"]) / total_interactions) * 100,2)
+    #     )
+    #     print(datetime.utcnow())
+    #     db.merge(db_featureinteraction)
+    # db.commit()
 
     answer = {}
     
