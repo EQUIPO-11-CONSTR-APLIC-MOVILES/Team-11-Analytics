@@ -231,26 +231,11 @@ async def setup(userID, lat, lon):
     except:
         return None
     
-from fastapi import Depends
-from sqlalchemy.orm import Session
-
-# Clean the restaurant search types in the SQL database
-@app.get("/restaurant_search_types/clean")
-async def clean_restaurant_search_types(db: Session = Depends(db_dependency)):
-    try:
-        # Delete all entries in RestaurantTypes
-        db.query(models.RestaurantTypes).delete()
-        db.commit()  # Commit after deletion
-        return {"response": "Database Successfully cleaned"}
-    except Exception as e:
-        db.rollback()  # Rollback in case of any error
-        return {"error": str(e)}
-
-# Fetch and upsert restaurant search types from Firestore
 @app.get("/restaurant_search_types")
-async def get_restaurant_search_types(db: Session = Depends(db_dependency)):
+async def get_restaurant_search_types(db: db_dependency):
     try:
-        docs = firestoreDB.collection("restaurant_search_types").get()
+        # Fetch documents from Firestore
+        docs = await firestoreDB.collection("restaurant_search_types").get()
 
         type_count = {}
 
@@ -265,22 +250,20 @@ async def get_restaurant_search_types(db: Session = Depends(db_dependency)):
 
         if not type_count:
             return {"message": "No types found"}
-        
+
+        # Loop through the counted types and merge them into the SQL database
         for key, value in type_count.items():
-            # Check if the resType already exists in the database
-            existing_type = db.query(models.RestaurantTypes).filter_by(resType=key).first()
+            # Check if the type already exists
+            existing_entry = db.query(models.RestaurantTypes).filter_by(resType=key).first()
 
-            if existing_type:
-                # If the restaurant type exists, update its count
-                existing_type.count = value
+            if existing_entry:
+                existing_entry.count = value  # Update the count if it exists
             else:
-                # If it doesn't exist, insert a new record
-                new_type = models.RestaurantTypes(resType=key, count=value)
-                db.add(new_type)
-        
-        db.commit()  # Commit all changes after the loop
+                db_screen = models.RestaurantTypes(resType=key, count=value)
+                db.add(db_screen)  # Insert new entry
 
-        return {"updated_types": type_count}
+        db.commit()  # Commit all changes after the loop
+        return type_count
 
     except Exception as e:
         db.rollback()  # Rollback in case of error
