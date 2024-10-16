@@ -231,15 +231,22 @@ async def setup(userID, lat, lon):
     except:
         return None
     
-@app.get("/restaurant_search_types/clean")
-async def root(db: db_dependency):
-    db.query(models.RestaurantTypes).delete()
-    db.merge()
-    db.commit()
-    return {
-        "response": "Database Successfully cleaned"
-    }
+from fastapi import Depends
+from sqlalchemy.orm import Session
 
+# Clean the restaurant search types in the SQL database
+@app.get("/restaurant_search_types/clean")
+async def clean_restaurant_search_types(db: Session = Depends(db_dependency)):
+    try:
+        # Delete all entries in RestaurantTypes
+        db.query(models.RestaurantTypes).delete()
+        db.commit()  # Commit after deletion
+        return {"response": "Database Successfully cleaned"}
+    except Exception as e:
+        db.rollback()  # Rollback in case of any error
+        return {"error": str(e)}
+
+# Fetch and upsert restaurant search types from Firestore
 @app.get("/restaurant_search_types")
 async def get_restaurant_search_types(db: Session = Depends(db_dependency)):
     try:
@@ -258,8 +265,7 @@ async def get_restaurant_search_types(db: Session = Depends(db_dependency)):
 
         if not type_count:
             return {"message": "No types found"}
-
-        # Iterate through the type counts and perform upsert logic
+        
         for key, value in type_count.items():
             # Check if the resType already exists in the database
             existing_type = db.query(models.RestaurantTypes).filter_by(resType=key).first()
@@ -274,11 +280,12 @@ async def get_restaurant_search_types(db: Session = Depends(db_dependency)):
         
         db.commit()  # Commit all changes after the loop
 
-        return type_count
+        return {"updated_types": type_count}
 
     except Exception as e:
         db.rollback()  # Rollback in case of error
         return {"error": str(e)}
+
 
 @app.get("/FeaturesInteractions")
 async def setup(db: db_dependency):
