@@ -231,6 +231,15 @@ async def setup(userID, lat, lon):
     except:
         return None
     
+@app.get("/restaurant_search_types/clean")
+async def root(db: db_dependency):
+    db.query(models.RestaurantTypes).delete()
+    db.merge()
+    db.commit()
+    return {
+        "response": "Database Successfully cleaned"
+    }
+
 @app.get("/restaurant_search_types")
 async def get_restaurant_search_types(db: db_dependency):
     try:
@@ -268,7 +277,6 @@ async def get_restaurant_search_types(db: db_dependency):
     except Exception as e:
         db.rollback()  # Rollback in case of error
         return {"error": str(e)}
-
 
 @app.get("/FeaturesInteractions")
 async def setup(db: db_dependency):
