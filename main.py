@@ -10,7 +10,6 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 import pandas as pd
 from haversine import haversine
-from haversine import haversine
 
 cred = credentials.Certificate('restau-5dba7-firebase-adminsdk-jpame-be78ad3e26.json')
 app = firebase_admin.initialize_app(cred)
@@ -242,7 +241,7 @@ async def root(db: db_dependency):
     }
 
 @app.get("/restaurant_search_types")
-async def get_restaurant_search_types(db: db_dependency):
+async def get_restaurant_search_types(db: Session = Depends(db_dependency)):
     try:
         docs = firestoreDB.collection("restaurant_search_types").get()
 
@@ -259,12 +258,20 @@ async def get_restaurant_search_types(db: db_dependency):
 
         if not type_count:
             return {"message": "No types found"}
-        
+
+        # Iterate through the type counts and perform upsert logic
         for key, value in type_count.items():
-            # Prepare the data to be merged (insert if new, update if existing)
-            db_screen = models.RestaurantTypes(resType=key, count=value)
-            db.merge(db_screen)  # Use merge to update or insert
-            
+            # Check if the resType already exists in the database
+            existing_type = db.query(models.RestaurantTypes).filter_by(resType=key).first()
+
+            if existing_type:
+                # If the restaurant type exists, update its count
+                existing_type.count = value
+            else:
+                # If it doesn't exist, insert a new record
+                new_type = models.RestaurantTypes(resType=key, count=value)
+                db.add(new_type)
+        
         db.commit()  # Commit all changes after the loop
 
         return type_count
