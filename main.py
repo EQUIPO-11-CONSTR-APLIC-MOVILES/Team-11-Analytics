@@ -399,4 +399,49 @@ def most_liked_positive_reviewed_week(db: db_dependency):
     
     print(answer)
 
+@app.get("/AreaWithMoreLikedRestaurants")
+async def setup(db: db_dependency): # type: ignore
+
+    restaurants = firestoreDB.collection("restaurants").get()
+
+    users = firestoreDB.collection("users").get()
+
+    dictArray = []
+    for restaurant in restaurants:
+        rest_dict = {}
+        rest_dict["placeName"] = restaurant.to_dict().get("placeName")
+        rest_dict["doc_id"] = restaurant.id
+        dictArray.append(rest_dict)
+    df_restaurant = pd.DataFrame(dictArray)
+
+    #print(df_restaurant)
+
+    likesArray = []
+    for user in users:
+        user_dict = user.to_dict()
+        if user_dict.get("likes") and len(user_dict.get("likes"))>0:
+            likesArray.extend(user_dict.get("likes"))
+    
+    df_likes = pd.DataFrame(likesArray)   
+    df_likes = df_likes.rename(columns={0: "doc_id"})
+
+    df_likes.set_index("doc_id", inplace=True)
+    df_restaurant.set_index("doc_id", inplace=True)
+
+    result = df_likes.join(df_restaurant)
+
+    result = result.groupby('placeName').size().reset_index(name='LikesCount')
+
+    print(result)
+
+    answer = {}
+    
+    for index, row in result.iterrows():
+        answer[row["placeName"]] = int(row["LikesCount"])
+
+    most_area_liked = result.loc[result['LikesCount'].idxmax()]
+    least_area_liked = result.loc[result['LikesCount'].idxmin()]
+
+    answer["MostAreaLiked"] = most_area_liked["placeName"]
+    answer["LeastAreaLiked"] = least_area_liked["placeName"]
     return answer
