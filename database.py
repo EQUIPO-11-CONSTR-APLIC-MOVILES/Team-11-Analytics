@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 
-URL_DATABASE = 'postgresql://postgres:postgres@localhost:5432/RestaUAnalytics'
+URL_DATABASE = 'postgresql://postgres:postgres@localhost:5432/restauanalytics'
 
 engine = create_engine(URL_DATABASE)
 
