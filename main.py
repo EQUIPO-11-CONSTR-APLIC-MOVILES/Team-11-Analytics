@@ -398,6 +398,7 @@ def most_liked_positive_reviewed_week(db: db_dependency):
         }
     
     print(answer)
+    return answer
 
 @app.get("/AreaWithMoreLikedRestaurants")
 async def setup(db: db_dependency): # type: ignore
