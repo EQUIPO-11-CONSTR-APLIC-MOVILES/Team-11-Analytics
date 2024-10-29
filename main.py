@@ -230,6 +230,26 @@ async def setup(userID, lat, lon):
     
     except:
         return None
+
+@app.get("/reviewed_restaurant_percent")
+async def reviewed_restaurant_percent(userID: str):
+    try:
+        user_reviews = firestoreDB.collection("reviews").where("authorId", "==", userID).get()
+        
+        reviewed_restaurants = {review.to_dict()["restaurantId"] for review in user_reviews}
+        
+        total_restaurants = firestoreDB.collection("restaurants").get()
+        total_restaurant_count = len(total_restaurants)
+
+        if total_restaurant_count > 0:
+            review_percentage = int((len(reviewed_restaurants) / total_restaurant_count) * 100)
+            return review_percentage
+        else:
+            return 0  
+
+    except Exception as e:
+        return {"error": str(e)}
+
     
 @app.get("/restaurant_search_types/clean")
 async def root(db: db_dependency):
