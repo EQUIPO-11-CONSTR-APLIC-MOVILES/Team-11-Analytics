@@ -390,12 +390,13 @@ def most_liked_positive_reviewed_week(db: db_dependency):
 
     df_rest_reviews_likes = df_rest_reviews_likes[["name", "count_likes", "count_reviews"]]
 
-    answer = {}
+    answer = []
     for _, row in df_rest_reviews_likes.iterrows():
-        answer[row["name"]] = {
-            "count_likes": row["count_likes"],
-            "count_reviews": row["count_reviews"]
-        }
+        item = {}
+        item["name"] = row["name"]
+        item["count_likes"] = row["count_likes"]
+        item["count_reviews"] = row["count_reviews"]
+        answer.append(item)
     
     print(answer)
     return answer
