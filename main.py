@@ -467,3 +467,16 @@ async def setup(db: db_dependency): # type: ignore
     answer["MostAreaLiked"] = most_area_liked["placeName"]
     answer["LeastAreaLiked"] = least_area_liked["placeName"]
     return answer
+
+@app.get("/random-review")
+async def setup():
+
+    data = firestoreDB.collection("random_review").get()
+
+    leftReview = 0
+    for d in data:
+        d = d.to_dict()
+        if d["left_review"]:
+            leftReview += 1
+    
+    return leftReview/len(data)
