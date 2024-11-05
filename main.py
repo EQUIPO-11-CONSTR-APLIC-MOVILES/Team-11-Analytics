@@ -421,6 +421,45 @@ def most_liked_positive_reviewed_week(db: db_dependency):
     print(answer)
     return answer
 
+@app.get("/restaurantCommonQualities")
+def commonQualities(topN = 10):
+    topN = int(topN)
+    users = firestoreDB.collection("users").get()
+
+    likes_count = {}
+    for user in users:
+        user_data = user.to_dict()
+        if "likes" in user_data:
+            for like in user_data["likes"]:
+                if like in likes_count:
+                    likes_count[like] += 1
+                else:
+                    likes_count[like] = 1
+                    
+    docs = (firestoreDB.collection("restaurants").stream())
+    
+    docList = []
+    for doc in docs:
+        docData = doc._data
+        docData['id'] = doc.id
+        docData['likeCount'] = likes_count[doc.id] if doc.id in likes_count else 0
+        docList.append(docData)
+        
+    docList = sorted(docList, key=lambda x: x['likeCount'], reverse=True)
+    
+    categories = {}
+    for doc in docList[:topN]:
+        for cat in doc['categories']:
+            if cat in categories:
+                categories[cat] += 1
+            else:
+                categories[cat] = 1
+    
+    categories = {k: v for k, v in categories.items() if v > 2}
+                
+                
+    return categories
+
 @app.get("/AreaWithMoreLikedRestaurants")
 async def setup(db: db_dependency): # type: ignore
 
