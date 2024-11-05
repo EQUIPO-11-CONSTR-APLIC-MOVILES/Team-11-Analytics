@@ -230,6 +230,26 @@ async def setup(userID, lat, lon):
     
     except:
         return None
+
+@app.get("/reviewed_restaurant_percent")
+async def reviewed_restaurant_percent(userID: str):
+    try:
+        user_reviews = firestoreDB.collection("reviews").where("authorId", "==", userID).get()
+        
+        reviewed_restaurants = {review.to_dict()["restaurantId"] for review in user_reviews}
+        
+        total_restaurants = firestoreDB.collection("restaurants").get()
+        total_restaurant_count = len(total_restaurants)
+
+        if total_restaurant_count > 0:
+            review_percentage = int((len(reviewed_restaurants) / total_restaurant_count) * 100)
+            return review_percentage
+        else:
+            return 0  
+
+    except Exception as e:
+        return {"error": str(e)}
+
     
 @app.get("/restaurant_search_types/clean")
 async def root(db: db_dependency):
@@ -317,3 +337,185 @@ async def setup(db: db_dependency):
     answer["LessUsedFeature"] = less_used_feature["nameFeatureInteraction"]
 
     return answer
+
+
+@app.get("/like_review_week")
+def most_liked_positive_reviewed_week(db: db_dependency):
+
+    currentWeek = pd.Timestamp.now().week
+    currentYear = pd.Timestamp.now().year
+
+    current_week = str(currentYear) + "-" + str(currentWeek)
+
+    likes = firestoreDB.collection("like_date_restaurant_event").get()
+    restaurants = firestoreDB.collection("restaurants").get()
+    
+    reviews = firestoreDB.collection("reviews").get()
+
+    restaurantsDicts = []
+    for restaurant in restaurants:
+        restaurant_dictionary = restaurant.to_dict()
+        restaurant_dictionary["restaurantId"] = restaurant.id
+        restaurantsDicts.append(restaurant_dictionary)
+    df_rest = pd.DataFrame(restaurantsDicts)[["restaurantId", "name"]]
+
+
+    reviewsDicts = []
+    for review in reviews:
+        review_dictionary = review.to_dict()
+        review_dictionary["id"] = review.id
+        reviewsDicts.append(review_dictionary)
+    df_reviews = pd.DataFrame(reviewsDicts)[["date", "restaurantId", "rating"]]
+
+    likesDicts = []
+    for like in likes:
+        like_dictionary = like.to_dict()
+        like_dictionary["id"] = like.id
+        likesDicts.append(like_dictionary)
+    df_likes = pd.DataFrame(likesDicts)
+
+    df_likes["week"] = df_likes["date"].transform(lambda date: date.week)
+    df_likes["year"] = df_likes["date"].transform(lambda date: date.year)
+    df_likes["week"] = df_likes["year"].astype(str) + "-" + df_likes["week"].astype(str)
+    df_likes = df_likes[["restaurantId", "week"]]
+
+    df_reviews["week"] = df_reviews["date"].transform(lambda date: date.week)
+    df_reviews["year"] = df_reviews["date"].transform(lambda date: date.year)
+    df_reviews["week"] = df_reviews["year"].astype(str) + "-" + df_reviews["week"].astype(str)
+    df_reviews = df_reviews[["restaurantId", "rating", "week"]]
+
+    df_reviews = (df_reviews[df_reviews['week'] == current_week])[["restaurantId", "rating"]]
+    df_reviews = df_reviews[df_reviews['rating'] >= 2.5][["restaurantId"]]
+    df_likes = df_likes[df_likes['week'] == current_week][["restaurantId"]]
+
+    df_reviews["count_reviews"] = 1
+    df_likes["count_likes"] = 1
+
+    df_reviews = df_reviews.groupby(["restaurantId"])
+    df_reviews = df_reviews.sum()
+
+    df_likes = df_likes.groupby(["restaurantId"])
+    df_likes = df_likes.sum()
+
+    df_reviews = df_reviews.reset_index()
+    df_likes = df_likes.reset_index()
+
+    df_rest_reviews = pd.merge(df_rest, df_reviews, on='restaurantId', how='left')
+    df_rest_reviews["count_reviews"] = df_rest_reviews["count_reviews"].fillna(0)
+
+    df_rest_reviews_likes = pd.merge(df_rest_reviews, df_likes, on='restaurantId', how='left')
+    df_rest_reviews_likes["count_likes"] = df_rest_reviews_likes["count_likes"].fillna(0)
+
+    df_rest_reviews_likes = df_rest_reviews_likes.sort_values(by=["count_likes", "count_reviews"], ascending= [False, False])
+
+    df_rest_reviews_likes = df_rest_reviews_likes[["name", "count_likes", "count_reviews"]]
+
+    answer = []
+    for _, row in df_rest_reviews_likes.iterrows():
+        item = {}
+        item["name"] = row["name"]
+        item["count_likes"] = row["count_likes"]
+        item["count_reviews"] = row["count_reviews"]
+        answer.append(item)
+    
+    print(answer)
+    return answer
+
+@app.get("/restaurantCommonQualities")
+def commonQualities(topN = 10):
+    topN = int(topN)
+    users = firestoreDB.collection("users").get()
+
+    likes_count = {}
+    for user in users:
+        user_data = user.to_dict()
+        if "likes" in user_data:
+            for like in user_data["likes"]:
+                if like in likes_count:
+                    likes_count[like] += 1
+                else:
+                    likes_count[like] = 1
+                    
+    docs = (firestoreDB.collection("restaurants").stream())
+    
+    docList = []
+    for doc in docs:
+        docData = doc._data
+        docData['id'] = doc.id
+        docData['likeCount'] = likes_count[doc.id] if doc.id in likes_count else 0
+        docList.append(docData)
+        
+    docList = sorted(docList, key=lambda x: x['likeCount'], reverse=True)
+    
+    categories = {}
+    for doc in docList[:topN]:
+        for cat in doc['categories']:
+            if cat in categories:
+                categories[cat] += 1
+            else:
+                categories[cat] = 1
+    
+    categories = {k: v for k, v in categories.items() if v > 2}
+                
+                
+    return categories
+
+@app.get("/AreaWithMoreLikedRestaurants")
+async def setup(db: db_dependency): # type: ignore
+
+    restaurants = firestoreDB.collection("restaurants").get()
+
+    users = firestoreDB.collection("users").get()
+
+    dictArray = []
+    for restaurant in restaurants:
+        rest_dict = {}
+        rest_dict["placeName"] = restaurant.to_dict().get("placeName")
+        rest_dict["doc_id"] = restaurant.id
+        dictArray.append(rest_dict)
+    df_restaurant = pd.DataFrame(dictArray)
+
+    #print(df_restaurant)
+
+    likesArray = []
+    for user in users:
+        user_dict = user.to_dict()
+        if user_dict.get("likes") and len(user_dict.get("likes"))>0:
+            likesArray.extend(user_dict.get("likes"))
+    
+    df_likes = pd.DataFrame(likesArray)   
+    df_likes = df_likes.rename(columns={0: "doc_id"})
+
+    df_likes.set_index("doc_id", inplace=True)
+    df_restaurant.set_index("doc_id", inplace=True)
+
+    result = df_likes.join(df_restaurant)
+
+    result = result.groupby('placeName').size().reset_index(name='LikesCount')
+
+    print(result)
+
+    answer = {}
+    
+    for index, row in result.iterrows():
+        answer[row["placeName"]] = int(row["LikesCount"])
+
+    most_area_liked = result.loc[result['LikesCount'].idxmax()]
+    least_area_liked = result.loc[result['LikesCount'].idxmin()]
+
+    answer["MostAreaLiked"] = most_area_liked["placeName"]
+    answer["LeastAreaLiked"] = least_area_liked["placeName"]
+    return answer
+
+@app.get("/random-review")
+async def setup():
+
+    data = firestoreDB.collection("random_review").get()
+
+    leftReview = 0
+    for d in data:
+        d = d.to_dict()
+        if d["left_review"]:
+            leftReview += 1
+    
+    return leftReview/len(data)
