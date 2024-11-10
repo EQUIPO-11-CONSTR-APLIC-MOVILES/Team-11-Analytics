@@ -339,6 +339,35 @@ async def setup(db: db_dependency):
     return answer
 
 
+@app.get("/popular_categories")
+def popular_categories():
+
+    users = firestoreDB.collection("users").get()
+    print(len(users))
+
+    categories = {}
+
+    for user in users:
+        user_dictionary = user.to_dict()
+        if ("preferences" in user_dictionary):
+
+            for category in user_dictionary["preferences"]:
+                if (category in categories):
+                    categories[category] = categories[category] + 1
+                else:
+                    categories[category] = 0
+    
+    categoryList = []
+    for category in categories.keys():
+        categoryItem = {}
+        categoryItem["category"] = category
+        categoryItem["value"] = categories[category]
+        categoryList.append(categoryItem)
+
+    categoryList = sorted(categoryList, key = lambda x: x["value"], reverse=True)
+    return categoryList
+
+
 @app.get("/like_review_week")
 def most_liked_positive_reviewed_week(db: db_dependency):
 
