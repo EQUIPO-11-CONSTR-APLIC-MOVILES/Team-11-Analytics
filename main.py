@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Annotated
@@ -535,6 +535,24 @@ async def setup(db: db_dependency): # type: ignore
     answer["MostAreaLiked"] = most_area_liked["placeName"]
     answer["LeastAreaLiked"] = least_area_liked["placeName"]
     return answer
+
+@app.get("/weekly_maps_redirection")
+async def setup():
+    try:
+        seven_days_ago = datetime.now() - timedelta(days=7)
+
+        docs = (
+            firestoreDB.collection("map_search_times")
+            .where("time", ">=", seven_days_ago)
+            .get()
+        )
+
+        count = len(docs)
+        
+        return {"count": count}
+    except Exception as e:
+        return {"error": str(e)}
+
 
 @app.get("/random-review")
 async def setup():
