@@ -548,3 +548,19 @@ async def setup():
             leftReview += 1
     
     return leftReview/len(data)
+
+@app.get("/match-percentage")
+async def match_percentage(userID: str, restaurantID: str):
+    try:
+        userPrefs = firestoreDB.collection("users").document(userID).get().to_dict()["preferences"]
+        restaurantCat = firestoreDB.collection("restaurants").document(restaurantID).get().to_dict()["categories"]
+        
+        a = set(restaurantCat).intersection(set(userPrefs))
+        b = set(restaurantCat) if len(restaurantCat) < len(userPrefs) else set(userPrefs)
+        
+        return round(len(a)/len(b) * 100, 2)
+    
+    except Exception as e:
+        return {"error": str(e)}
+        
+        
