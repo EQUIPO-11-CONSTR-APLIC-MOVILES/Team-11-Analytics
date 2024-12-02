@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
@@ -563,4 +564,39 @@ async def match_percentage(userID: str, restaurantID: str):
     except Exception as e:
         return {"error": str(e)}
         
+@app.get("/TopAndBottomWeeks")
+async def top_and_bottom_weeks():
+    reviews = firestoreDB.collection("reviews").get()
+    
+    weekly_reviews = defaultdict(int)
+    
+    for review in reviews:
+        review_data = review.to_dict()
+        date_value = review_data.get("date")
         
+        if isinstance(date_value, datetime):
+            review_date = date_value
+        else:
+            try:
+                review_date = datetime.strptime(date_value, "%d de %B de %Y, %I:%M:%S %p UTC%z")
+            except ValueError:
+                return {"error": f"Formato de fecha no válido para {date_value}"}
+        
+        year, week, _ = review_date.isocalendar()
+        week_key = f"{year}-W{week}"
+        
+        weekly_reviews[week_key] += 1
+    
+    # Ordenar y calcular los top y bottom 5
+    sorted_weeks = sorted(weekly_reviews.items(), key=lambda x: x[1], reverse=True)
+    
+    top_3 = sorted_weeks[:3]
+    bottom_3 = sorted(weekly_reviews.items(), key=lambda x: x[1])[:3][::-1]
+    
+    result = {}
+    for i, (week, count) in enumerate(top_3, 1):
+        result[f"Most {i} ({week})"] = count
+    for i, (week, count) in enumerate(bottom_3, 1):
+        result[f"Least {i} ({week})"] = count
+    
+    return result
