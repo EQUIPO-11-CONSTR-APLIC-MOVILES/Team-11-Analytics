@@ -618,3 +618,57 @@ async def top_and_bottom_weeks():
         result[f"Least {i} ({week})"] = count
     
     return result
+
+
+@app.get("/averageRating")
+async def average_rating():
+    # Retrieve all reviews from Firestore
+    reviews = firestoreDB.collection("reviews").get()
+    
+    # Dictionaries to store total ratings and counts per week
+    weekly_ratings = defaultdict(list)
+    
+    for review in reviews:
+        review_data = review.to_dict()
+        date_value = review_data.get("date")
+        rating = review_data.get("rating")
+        
+        # Validate and parse the date
+        if isinstance(date_value, datetime):
+            review_date = date_value
+        else:
+            try:
+                review_date = datetime.strptime(date_value, "%d de %B de %Y, %I:%M:%S %p UTC%z")
+            except ValueError:
+                return {"error": f"Formato de fecha no válido para {date_value}"}
+        
+        # Validate and parse the rating
+        if not isinstance(rating, (int, float)):
+            return {"error": f"Rating no válido para la reseña con fecha {date_value}"}
+        
+        # Group by ISO calendar week (year and week number)
+        year, week, _ = review_date.isocalendar()
+        week_key = f"{year}-W{week}"
+        
+        # Add the rating to the list for this week
+        weekly_ratings[week_key].append(rating)
+    
+    # Calculate the average rating for each week
+    average_ratings = {
+        week: sum(ratings) / len(ratings) for week, ratings in weekly_ratings.items()
+    }
+    
+    # Sort weeks by average rating in descending and ascending order
+    sorted_weeks = sorted(average_ratings.items(), key=lambda x: x[1], reverse=True)
+    
+    top_3 = sorted_weeks[:3]
+    bottom_3 = sorted(average_ratings.items(), key=lambda x: x[1])[:3][::-1]
+    
+    # Format the result
+    result = {}
+    for i, (week, avg_rating) in enumerate(top_3, 1):
+        result[f"Top {i} ({week})"] = round(avg_rating, 2)
+    for i, (week, avg_rating) in enumerate(bottom_3, 1):
+        result[f"Bottom {i} ({week})"] = round(avg_rating, 2)
+    
+    return result
