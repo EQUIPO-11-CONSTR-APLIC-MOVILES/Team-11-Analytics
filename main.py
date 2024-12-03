@@ -1,4 +1,5 @@
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Annotated
@@ -339,6 +340,35 @@ async def setup(db: db_dependency):
     return answer
 
 
+@app.get("/popular_categories")
+def popular_categories():
+
+    users = firestoreDB.collection("users").get()
+    print(len(users))
+
+    categories = {}
+
+    for user in users:
+        user_dictionary = user.to_dict()
+        if ("preferences" in user_dictionary):
+
+            for category in user_dictionary["preferences"]:
+                if (category in categories):
+                    categories[category] = categories[category] + 1
+                else:
+                    categories[category] = 0
+    
+    categoryList = []
+    for category in categories.keys():
+        categoryItem = {}
+        categoryItem["category"] = category
+        categoryItem["value"] = categories[category]
+        categoryList.append(categoryItem)
+
+    categoryList = sorted(categoryList, key = lambda x: x["value"], reverse=True)
+    return categoryList
+
+
 @app.get("/like_review_week")
 def most_liked_positive_reviewed_week(db: db_dependency):
 
@@ -507,6 +537,24 @@ async def setup(db: db_dependency): # type: ignore
     answer["LeastAreaLiked"] = least_area_liked["placeName"]
     return answer
 
+@app.get("/weekly_maps_redirection")
+async def setup():
+    try:
+        seven_days_ago = datetime.now() - timedelta(days=7)
+
+        docs = (
+            firestoreDB.collection("map_search_times")
+            .where("time", ">=", seven_days_ago)
+            .get()
+        )
+
+        count = len(docs)
+        
+        return {"count": count}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/random-review")
 async def setup():
 
@@ -519,3 +567,108 @@ async def setup():
             leftReview += 1
     
     return leftReview/len(data)
+
+@app.get("/match-percentage")
+async def match_percentage(userID: str, restaurantID: str):
+    try:
+        userPrefs = firestoreDB.collection("users").document(userID).get().to_dict()["preferences"]
+        restaurantCat = firestoreDB.collection("restaurants").document(restaurantID).get().to_dict()["categories"]
+        
+        a = set(restaurantCat).intersection(set(userPrefs))
+        b = set(restaurantCat) if len(restaurantCat) < len(userPrefs) else set(userPrefs)
+        
+        return round(len(a)/len(b) * 100, 2)
+    
+    except Exception as e:
+        return {"error": str(e)}
+        
+@app.get("/TopAndBottomWeeks")
+async def top_and_bottom_weeks():
+    reviews = firestoreDB.collection("reviews").get()
+    
+    weekly_reviews = defaultdict(int)
+    
+    for review in reviews:
+        review_data = review.to_dict()
+        date_value = review_data.get("date")
+        
+        if isinstance(date_value, datetime):
+            review_date = date_value
+        else:
+            try:
+                review_date = datetime.strptime(date_value, "%d de %B de %Y, %I:%M:%S %p UTC%z")
+            except ValueError:
+                return {"error": f"Formato de fecha no válido para {date_value}"}
+        
+        year, week, _ = review_date.isocalendar()
+        week_key = f"{year}-W{week}"
+        
+        weekly_reviews[week_key] += 1
+    
+    # Ordenar y calcular los top y bottom 5
+    sorted_weeks = sorted(weekly_reviews.items(), key=lambda x: x[1], reverse=True)
+    
+    top_3 = sorted_weeks[:3]
+    bottom_3 = sorted(weekly_reviews.items(), key=lambda x: x[1])[:3][::-1]
+    
+    result = {}
+    for i, (week, count) in enumerate(top_3, 1):
+        result[f"Most {i} ({week})"] = count
+    for i, (week, count) in enumerate(bottom_3, 1):
+        result[f"Least {i} ({week})"] = count
+    
+    return result
+
+
+@app.get("/averageRating")
+async def average_rating():
+    # Retrieve all reviews from Firestore
+    reviews = firestoreDB.collection("reviews").get()
+    
+    # Dictionaries to store total ratings and counts per week
+    weekly_ratings = defaultdict(list)
+    
+    for review in reviews:
+        review_data = review.to_dict()
+        date_value = review_data.get("date")
+        rating = review_data.get("rating")
+        
+        # Validate and parse the date
+        if isinstance(date_value, datetime):
+            review_date = date_value
+        else:
+            try:
+                review_date = datetime.strptime(date_value, "%d de %B de %Y, %I:%M:%S %p UTC%z")
+            except ValueError:
+                return {"error": f"Formato de fecha no válido para {date_value}"}
+        
+        # Validate and parse the rating
+        if not isinstance(rating, (int, float)):
+            return {"error": f"Rating no válido para la reseña con fecha {date_value}"}
+        
+        # Group by ISO calendar week (year and week number)
+        year, week, _ = review_date.isocalendar()
+        week_key = f"{year}-W{week}"
+        
+        # Add the rating to the list for this week
+        weekly_ratings[week_key].append(rating)
+    
+    # Calculate the average rating for each week
+    average_ratings = {
+        week: sum(ratings) / len(ratings) for week, ratings in weekly_ratings.items()
+    }
+    
+    # Sort weeks by average rating in descending and ascending order
+    sorted_weeks = sorted(average_ratings.items(), key=lambda x: x[1], reverse=True)
+    
+    top_3 = sorted_weeks[:3]
+    bottom_3 = sorted(average_ratings.items(), key=lambda x: x[1])[:3][::-1]
+    
+    # Format the result
+    result = {}
+    for i, (week, avg_rating) in enumerate(top_3, 1):
+        result[f"Top {i} ({week})"] = round(avg_rating, 2)
+    for i, (week, avg_rating) in enumerate(bottom_3, 1):
+        result[f"Bottom {i} ({week})"] = round(avg_rating, 2)
+    
+    return result
